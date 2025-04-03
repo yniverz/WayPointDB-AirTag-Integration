@@ -5,7 +5,7 @@ Lightweight App to integrate AirTags into WayPointDB
 - Sign into your iCloud account on the Mac User you want to use for AirTags
 - Ensure FindMy is enabled in the iCloud settings on the Mac User
 - Ensure Location Services is enabled on the Mac User
-- Ensure you have the correct MacOS version (11.13-14.x)
+- Ensure you have a supported MacOS version (11.13-14.3.1)
 
 # Installation
 
