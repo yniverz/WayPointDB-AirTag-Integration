@@ -10,7 +10,7 @@ from urllib.parse import urlencode, urlparse, urlunparse, parse_qs
 # Configuration File
 ###############################################################################
 
-CONFIG_FILE = "my_findmy_config.json"
+CONFIG_FILE = "waypointdb_findmy_config.json"
 
 def load_config():
     """
@@ -197,6 +197,15 @@ class ItemsDataMonitor:
         if not server_url:
             print(f"No server_url for item {item.serialNumber} in row {row}, skipping.")
             return
+        
+        # add path /api/v1/gps/batch to the server_url
+        if not server_url.endswith("/"):
+            server_url += "/"
+        server_url += "api/v1/gps/batch"
+        # Check if server_url is valid
+        if not server_url.startswith("http://") and not server_url.startswith("https://"):
+            print(f"Invalid server_url for item {item.serialNumber}: {server_url}")
+            return
 
         # Append ?api_key=... to the server_url
         parsed = urlparse(server_url)
@@ -334,6 +343,32 @@ def build_main_ui(root, config, monitor):
     btn_force = tk.Button(bottom_frame, text="Force Refresh Now", command=monitor.force_refresh)
     btn_force.pack(side="left", padx=10)
 
+class EntryWithPlaceholder(tk.Entry):
+    def __init__(self, placeholder, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.placeholder = placeholder
+        self.placeholder_color = 'grey'
+        self.default_fg_color = self['fg']
+
+        self.bind("<FocusIn>", self.foc_in)
+        self.bind("<FocusOut>", self.foc_out)
+
+        self.put_placeholder()
+
+    def put_placeholder(self):
+        self.insert(0, self.placeholder)
+        self['fg'] = self.placeholder_color
+
+    def foc_in(self, *args):
+        if self['fg'] == self.placeholder_color:
+            self.delete('0', 'end')
+            self['fg'] = self.default_fg_color
+
+    def foc_out(self, *args):
+        if not self.get():
+            self.put_placeholder()
+
 def build_tag_table(frame, config):
     """
     Clear and rebuild the config table from config["tag_configs"].
@@ -346,7 +381,7 @@ def build_tag_table(frame, config):
     header = tk.Frame(frame)
     header.pack(fill="x", pady=(0,5))
     tk.Label(header, text="Serial", width=20).pack(side="left", padx=5)
-    tk.Label(header, text="Server URL", width=30).pack(side="left", padx=5)
+    tk.Label(header, text="WayPointDB Base URL", width=30).pack(side="left", padx=5)
     tk.Label(header, text="API Key", width=20).pack(side="left", padx=5)
     tk.Label(header, text="Actions", width=8).pack(side="left", padx=5)
 
@@ -358,7 +393,7 @@ def build_tag_table(frame, config):
         ent_serial.pack(side="left", padx=5)
         ent_serial.insert(0, row.get("serial", ""))
 
-        ent_server = tk.Entry(row_frame, width=30)
+        ent_server = EntryWithPlaceholder("http(s)://waypointdb.domain", row_frame, width=30)
         ent_server.pack(side="left", padx=5)
         ent_server.insert(0, row.get("server_url", ""))
 
