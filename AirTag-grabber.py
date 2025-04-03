@@ -297,7 +297,7 @@ class ItemsDataMonitor:
 ###############################################################################
 
 def build_main_ui(root, config, monitor):
-    root.title("MyFindMy (Python/Tkinter) - Tag-Specific Config Only")
+    root.title("WayPointDB AirTag Integration")
 
     # Row 1: List of tracked items
     items_frame = tk.LabelFrame(root, text="Tracked Items (double-click to add config)")
