@@ -1,6 +1,8 @@
 # WayPointDB-AirTag-Integration
 Lightweight App to integrate AirTags into WayPointDB
 
+<img width="830" alt="Preview" src="https://github.com/user-attachments/assets/6a898ac1-19c9-41a2-a243-e676f86c64ef" />
+
 # Prerequisites
 
 - A Device running MacOS at all times
