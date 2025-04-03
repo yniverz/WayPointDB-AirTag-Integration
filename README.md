@@ -1,3 +1,5 @@
+[![License: NCPUL](https://img.shields.io/badge/license-NCPUL-blue.svg)](./LICENSE.md)
+
 # WayPointDB-AirTag-Integration
 Lightweight App to integrate AirTags into WayPointDB
 
