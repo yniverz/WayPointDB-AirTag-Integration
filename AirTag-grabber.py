@@ -137,7 +137,7 @@ class ItemsDataMonitor:
             loc = ItemLocation(
                 latitude=loc_data.get("latitude", 0.0),
                 longitude=loc_data.get("longitude", 0.0),
-                timeStamp=loc_data.get("timeStamp", 0.0),
+                timeStamp=loc_data.get("timeStamp", 0.0) / 1000,
                 horizontalAccuracy=loc_data.get("horizontalAccuracy", 0.0),
                 verticalAccuracy=loc_data.get("verticalAccuracy", 0.0),
                 altitude=loc_data.get("altitude", 0.0)
