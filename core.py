@@ -6,13 +6,14 @@ import requests
 import tkinter as tk
 from urllib.parse import urlencode, urlparse, urlunparse, parse_qs
 
-VERSION = "---"
+VERSION = open("VERSION", "r").read().strip()
 
 ###############################################################################
 # Configuration File
 ###############################################################################
 
 CONFIG_FILE = "waypointdb_findmy_config.json"
+PENDING_DATA_FILE = "pending_data.json"  # NEW: for storing unsent location data
 
 def load_config():
     """
@@ -62,7 +63,7 @@ class FindMyItem:
         self.location = location  # ItemLocation
 
 ###############################################################################
-# Core Logic: Reading Items.data, Sending to Server(s)
+# Core Logic: Reading Items.data, Sending to Server(s), and Storing Unsent Data
 ###############################################################################
 
 class ItemsDataMonitor:
@@ -70,7 +71,13 @@ class ItemsDataMonitor:
     Periodically reads `Items.data`, detects changes, sends updates for any
     tag config row that matches the item serial. If an item has multiple rows,
     multiple HTTP requests are made (one per row).
+
+    # NEW OR MODIFIED:
+    - We store unsent data in memory and on disk (in PENDING_DATA_FILE).
+    - On each send attempt, we try to flush existing pending data plus the new one.
+      If send fails, the data remains in pending. If send succeeds, it is removed.
     """
+
     def __init__(self, config):
         # config is a dict: { "tag_configs": [ {...}, {...} ] }
         self.config = config
@@ -84,6 +91,33 @@ class ItemsDataMonitor:
         # UI references
         self.items_listbox = None  # the Listbox that shows discovered items
         self.item_list = []        # local mirror of items so we know what's in each index
+
+        # NEW: Load pending data from disk so we can retry sending it
+        self.pending_data = self.load_pending_data()  # dict: key=(serial::serverUrl), val=[gps_data, ...]
+
+    def load_pending_data(self):
+        """Load pending data (unsent location points) from JSON file."""
+        if not os.path.isfile(PENDING_DATA_FILE):
+            return {}
+        try:
+            with open(PENDING_DATA_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            # Should be a dict of key -> list
+            if isinstance(data, dict):
+                return data
+            else:
+                return {}
+        except Exception as e:
+            print(f"Error reading {PENDING_DATA_FILE}: {e}")
+            return {}
+
+    def save_pending_data(self):
+        """Save the self.pending_data dictionary to disk."""
+        try:
+            with open(PENDING_DATA_FILE, "w", encoding="utf-8") as f:
+                json.dump(self.pending_data, f, indent=2)
+        except Exception as e:
+            print(f"Error saving {PENDING_DATA_FILE}: {e}")
 
     def start_polling(self, root):
         self.polling = True
@@ -189,6 +223,11 @@ class ItemsDataMonitor:
     def send_item_location(self, item, row):
         """
         Sends location with row['server_url'] and row['api_key'].
+
+        # NEW OR MODIFIED:
+        - We add the new location data to pending_data, then attempt to send
+          all pending data (including the new one). If it fails, the data stays.
+          If it succeeds, we clear it out.
         """
         loc = item.location
         if not loc:
@@ -203,46 +242,83 @@ class ItemsDataMonitor:
         # add path /api/v1/gps/batch to the server_url
         if not server_url.endswith("/"):
             server_url += "/"
-        server_url += "api/v1/gps/batch"
+        server_url_with_path = server_url + "api/v1/gps/batch"
         # Check if server_url is valid
-        if not server_url.startswith("http://") and not server_url.startswith("https://"):
-            print(f"Invalid server_url for item {item.serialNumber}: {server_url}")
+        if not server_url_with_path.startswith("http://") and not server_url_with_path.startswith("https://"):
+            print(f"Invalid server_url for item {item.serialNumber}: {server_url_with_path}")
             return
 
-        # Append ?api_key=... to the server_url
-        parsed = urlparse(server_url)
+        # Build the new data point
+        new_data_point = {
+            "timestamp": str(loc.timeStamp),
+            "latitude": loc.latitude,
+            "longitude": loc.longitude,
+            "horizontal_accuracy": loc.horizontalAccuracy,
+            "altitude": loc.altitude,
+            "vertical_accuracy": loc.verticalAccuracy,
+            "heading": 0,
+            "heading_accuracy": 0,
+            "speed": 0,
+            "speed_accuracy": 0
+        }
+
+        # 1) Add to pending_data for this serial + serverUrl
+        pending_key = f"{item.serialNumber}::{server_url}"
+        if pending_key not in self.pending_data:
+            self.pending_data[pending_key] = []
+        self.pending_data[pending_key].append(new_data_point)
+        self.save_pending_data()
+
+        # 2) Attempt to flush all pending data in one request
+        self.attempt_send_pending(pending_key, api_key)
+
+    def attempt_send_pending(self, pending_key, api_key):
+        """
+        Attempt to send *all* pending data for a particular (serial+serverUrl).
+        If it succeeds, remove them from pending_data; if fails, keep them.
+        """
+        # If there's nothing queued, skip
+        if pending_key not in self.pending_data or not self.pending_data[pending_key]:
+            return
+
+        # Parse out serverUrl from pending_key
+        # pending_key =  "serialNumber::serverUrl"
+        # We only want the serverUrl portion after the "::"
+        parts = pending_key.split("::", 1)
+        if len(parts) != 2:
+            return
+        serial_num = parts[0]
+        base_url = parts[1]
+        # Construct final URL
+        if not base_url.endswith("/"):
+            base_url += "/"
+        final_url = base_url + "api/v1/gps/batch"
+
+        # Append ?api_key=... to the final_url
+        parsed = urlparse(final_url)
         qdict = parse_qs(parsed.query)
         qdict["api_key"] = [api_key]
         new_query = urlencode(qdict, doseq=True)
         final_url = urlunparse(parsed._replace(query=new_query))
 
-        # Build the JSON
+        # Prepare full payload from all pending data
+        all_data_points = self.pending_data[pending_key]
         payload = {
-            "gps_data": [
-                {
-                    "timestamp": str(loc.timeStamp),
-                    "latitude": loc.latitude,
-                    "longitude": loc.longitude,
-                    "horizontal_accuracy": loc.horizontalAccuracy,
-                    "altitude": loc.altitude,
-                    "vertical_accuracy": loc.verticalAccuracy,
-                    "heading": 0,
-                    "heading_accuracy": 0,
-                    "speed": 0,
-                    "speed_accuracy": 0
-                }
-            ]
+            "gps_data": all_data_points
         }
 
         try:
             r = requests.post(final_url, json=payload, timeout=10)
             if r.status_code == 200:
-                print(f"Location sent for serial={item.serialNumber} to {server_url} OK.")
-                self.last_sent_timestamps[item.serialNumber] = time.time()
+                print(f"Location sent for serial={serial_num} to {base_url} OK.")
+                self.last_sent_timestamps[serial_num] = time.time()
+                # Clear the queue on success
+                self.pending_data[pending_key] = []
+                self.save_pending_data()
             else:
-                print(f"HTTP {r.status_code} for serial={item.serialNumber} to {server_url}: {r.text}")
+                print(f"HTTP {r.status_code} for serial={serial_num} to {base_url}: {r.text}")
         except Exception as e:
-            print(f"Error sending location for {item.serialNumber} to {server_url}: {e}")
+            print(f"Error sending location for {serial_num} to {base_url}: {e}")
 
     ###########################################################################
     # UI Logic for the "Tracked Items" Listbox
@@ -299,9 +375,8 @@ class ItemsDataMonitor:
         }
         self.config["tag_configs"].append(entry)
         # Rebuild the tag config table
-        build_tag_table(tag_table_frame, self.config)
-        # Optionally auto-save so user sees it right away
-        # but let's not auto-save to avoid confusion. They can "Save & Refresh" when done.
+        build_tag_table(tag_table_frame, self.config, self)
+        # (We won't auto-save to avoid confusion; user can "Save & Refresh" later.)
 
 ###############################################################################
 # Tkinter UI
@@ -327,7 +402,7 @@ def build_main_ui(root, config, monitor):
     tag_table_frame = tk.Frame(tags_frame)
     tag_table_frame.pack(fill="x", expand=True)
 
-    build_tag_table(tag_table_frame, config)
+    build_tag_table(tag_table_frame, config, monitor)
 
     # Row 3: Buttons
     bottom_frame = tk.Frame(root)
@@ -371,10 +446,13 @@ class EntryWithPlaceholder(tk.Entry):
         if not self.get():
             self.put_placeholder()
 
-def build_tag_table(frame, config):
+def build_tag_table(frame, config, monitor):
     """
     Clear and rebuild the config table from config["tag_configs"].
-    Each row: serial, server_url, api_key, [Delete]
+    Each row: serial, name, server_url, api_key, [Delete]
+
+    # NEW:
+    - Additional column "Name" that tries to match the serial in monitor.last_items.
     """
     for child in frame.winfo_children():
         child.destroy()
@@ -382,7 +460,9 @@ def build_tag_table(frame, config):
     # Header
     header = tk.Frame(frame)
     header.pack(fill="x", pady=(0,5))
-    tk.Label(header, text="Serial", width=20).pack(side="left", padx=5)
+
+    tk.Label(header, text="Serial", width=15).pack(side="left", padx=5)
+    tk.Label(header, text="Name", width=15).pack(side="left", padx=5)  # NEW column
     tk.Label(header, text="WayPointDB Base URL", width=30).pack(side="left", padx=5)
     tk.Label(header, text="API Key", width=20).pack(side="left", padx=5)
     tk.Label(header, text="Actions", width=8).pack(side="left", padx=5)
@@ -391,9 +471,16 @@ def build_tag_table(frame, config):
         row_frame = tk.Frame(frame)
         row_frame.pack(fill="x", pady=2)
 
-        ent_serial = tk.Entry(row_frame, width=20)
+        ent_serial = tk.Entry(row_frame, width=15)
         ent_serial.pack(side="left", padx=5)
         ent_serial.insert(0, row.get("serial", ""))
+
+        # NEW: We display a label for the Name, by looking at monitor.last_items
+        serial_val = row.get("serial", "")
+        matching_item = next((itm for itm in monitor.last_items if itm.serialNumber == serial_val), None)
+        item_name = matching_item.name if matching_item else "---"
+        lbl_name = tk.Label(row_frame, text=item_name, width=15)
+        lbl_name.pack(side="left", padx=5)
 
         ent_server = EntryWithPlaceholder("http(s)://waypointdb.domain", row_frame, width=30)
         ent_server.pack(side="left", padx=5)
@@ -405,7 +492,7 @@ def build_tag_table(frame, config):
 
         def delete_this(r=row):
             config["tag_configs"].remove(r)
-            build_tag_table(frame, config)
+            build_tag_table(frame, config, monitor)
 
         btn_del = tk.Button(row_frame, text="Delete", command=delete_this)
         btn_del.pack(side="left", padx=5)
@@ -424,11 +511,13 @@ def collect_tag_table_into_config(frame, config):
 
     for row_frame in children[1:]:
         row_kids = row_frame.winfo_children()
-        if len(row_kids) < 4:
+        # row_kids structure:
+        #   0 ent_serial, 1 lbl_name, 2 ent_server, 3 ent_api, 4 btn_delete
+        if len(row_kids) < 5:
             continue
         ent_serial = row_kids[0]
-        ent_server = row_kids[1]
-        ent_api = row_kids[2]
+        ent_server = row_kids[2]
+        ent_api = row_kids[3]
         serial_val = ent_serial.get().strip()
         server_val = ent_server.get().strip()
         api_val = ent_api.get().strip()
@@ -460,3 +549,4 @@ if __name__ == "__main__":
 
     root.mainloop()
     monitor.stop_polling()
+    
