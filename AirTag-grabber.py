@@ -6,6 +6,8 @@ import requests
 import tkinter as tk
 from urllib.parse import urlencode, urlparse, urlunparse, parse_qs
 
+VERSION = "---"
+
 ###############################################################################
 # Configuration File
 ###############################################################################
@@ -306,7 +308,7 @@ class ItemsDataMonitor:
 ###############################################################################
 
 def build_main_ui(root, config, monitor):
-    root.title("WayPointDB AirTag Integration")
+    root.title("WayPointDB AirTag Integration " + VERSION)
 
     # Row 1: List of tracked items
     items_frame = tk.LabelFrame(root, text="Tracked Items (double-click to add config)")

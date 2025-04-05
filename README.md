@@ -13,13 +13,23 @@ Lightweight App to integrate AirTags into WayPointDB
 - Ensure you have a supported MacOS version (11.13-14.3.1)
 
 # Installation
-- Download the latest release [here](https://github.com/yniverz/WayPointDB-AirTag-Integration/releases/latest)
-- Corrupt or Insecure
-  - Before being able to use this, upon opening macos might flag this as insecure. You need to go to your System Settings, `Privacy & Security`and find and click the `Open Anyway`option.
-  - Alternatively it may say tha App is corrupt. In that case you need to run this command: `xattr -c "WayPointDB AirTags.app"`
+Run the following command to install the script:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/yniverz/WayPointDB-AirTag-Integration/refs/heads/main/install.sh | bash
+```
+
+- Before being able to use this, upon opening macos might flag this as insecure. You need to go to your System Settings, `Privacy & Security`and find and click the `Open Anyway`option.
 - Activate `Full Disk Access` for the app (you will need to run it first, so it shows up in the settings)
 - Run the Application (Updates will be sent while app is running)
 - Enjoy
+
+# Update
+Run the following command to update the script:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/yniverz/WayPointDB-AirTag-Integration/refs/heads/main/update.sh | bash
+```
 
 # Build Yourself (Only possible on MacOS)
 - Clone this repository
