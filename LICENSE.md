@@ -1,4 +1,4 @@
-# Non-Commercial Public Use License (NCPUL) v1.2
+# Non-Commercial Public Use License (NCPUL) v1.3
 
 **Preamble**  
 The intent of this license is to allow anyone to use, modify, and share the licensed software freely for **non-commercial purposes**, while expressly permitting voluntary, non‑required support (e.g. tips or donations) provided that the Software remains freely accessible to all. Commercial or monetized use remains disallowed under this License unless a separate license is obtained from the Licensor.
@@ -35,7 +35,7 @@ All rights granted herein are conditional on the use being Non-Commercial. **Any
 
 If You distribute or share the Software, or any Derivative Work, with any other party (with or without modifications), You must:
 
-1. **Include This License.** Provide a copy of this NCPUL (v1.2) with the Software or Derivative Work, and ensure that any recipient understands that the work is provided under these Non-Commercial terms.  
+1. **Include This License.** Provide a copy of this NCPUL (v1.3) with the Software or Derivative Work, and ensure that any recipient understands that the work is provided under these Non-Commercial terms.  
 2. **Retain Notices.** Keep all copyright, author, and license notices intact. Do not remove or alter any text referring to this Non-Commercial Public Use License.  
 3. **Apply the Same Terms.** Any Derivative Work You distribute must be licensed under this same License (NCPUL) or terms no less restrictive. You may not relicense a Derivative Work under any license permitting commercial use.  
 4. **Attribution (Optional).** You may include an attribution requirement here if desired, for example: “Any public distribution of this Software or a Derivative Work must give credit to the original author(s) in a manner reasonable to the medium, without implying endorsement.”
@@ -74,4 +74,4 @@ This License shall be governed by and construed in accordance with the laws of t
 
 ---
 
-**End of Non-Commercial Public Use License (NCPUL) v1.2**
+**End of Non-Commercial Public Use License (NCPUL) v1.3**
