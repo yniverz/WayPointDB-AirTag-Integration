@@ -309,7 +309,7 @@ class ItemsDataMonitor:
 
         try:
             r = requests.post(final_url, json=payload, timeout=10)
-            if r.status_code == 200:
+            if str(r.status_code).startswith("2"):
                 print(f"Location sent for serial={serial_num} to {base_url} OK.")
                 self.last_sent_timestamps[serial_num] = time.time()
                 # Clear the queue on success
